@@ -8,8 +8,8 @@ def exercitiul1(start, end, pas):
    # pas = pasul de esantionare
 
    # subpunct a
-   # axa reala de timp (continuu) (expl : se creeaza un vector t cu "puncte" de la 0 la 0.3 (sec) cu progresia de 0.0005)
-   t = np.linspace(start, end, int((end - start) / pas) + 1)
+   # axa reala de timp (continuu) (expl : se creeaza un vector t cu "puncte" de la 0 la 0.03 (sec) cu progresia de 0.0005)
+   t = np.linspace(start, end, int((end - start) / pas))
 
 
    # subpunct b
@@ -25,9 +25,7 @@ def exercitiul1(start, end, pas):
    for i in range(len(semnale)):
       axs[i].plot(t, semnale[i])
       axs[i].set_title(titluri[i])
-      axs[i].set_ylabel("amplitudine")
       axs[i].grid()
-   axs[-1].set_xlabel("timp")
    plt.tight_layout(rect=[0, 0, 1, 1])
    plt.savefig("Images/ex1_ab.pdf", format='pdf')
    plt.show()
@@ -46,8 +44,6 @@ def exercitiul1(start, end, pas):
    for i in range(len(semnale)):
       axs[i].stem(t,semnale[i])
       axs[i].set_title(titluri[i])
-      axs[i].set_ylabel("amplitudine")
-   axs[-1].set_xlabel("timp")
    plt.tight_layout(rect=[0, 0, 1, 1])
    plt.savefig("Images/ex1_c.pdf", format='pdf')
    plt.show()
@@ -58,18 +54,14 @@ def exercitiul1(start, end, pas):
 
 def exercitiul2():
 
-   def plot_discret(x, title):
-      plt.stem(x)
-      plt.xlabel("esantion")
-      plt.ylabel("amplitudine")
+   def plot_discret(t, x, title):
+      plt.stem(t, x)
       plt.grid()
       plt.savefig("Images/ex2_"+ title +".pdf", format='pdf')
       plt.show()
    
    def plot_continuu(t,x,title):
-      plt.plot(t, c)
-      plt.xlabel("timp")
-      plt.ylabel("amplitudine")
+      plt.plot(t, x)
       plt.grid()
       plt.savefig("Images/ex2_"+ title +".pdf", format='pdf')
       plt.show()
@@ -78,14 +70,16 @@ def exercitiul2():
    # subpunct a
    # sinusoidal | f = 400 Hz | #e = 1600 
    # f * durata = #e --> durata = 1600 / 400 = 4 sec
-   a = np.sin(2 * np.pi * 400 * np.linspace(0,4,1600))
-   plot_discret(a ,"a")
-  
+   t = np.linspace(0,4,1600)
+   a = np.sin(2 * np.pi * 400 * t)
+   plot_discret(t, a ,"a")
+
 
    # subpunct b
    # sinusoidal | f = 800 Hz | durata = 3 sec
-   b = np.sin(2 * np.pi * 800 * np.linspace(0,3, 3*800))
-   plot_discret(b ,"b")
+   t = np.linspace(0,3, 3*800)
+   b = np.sin(2 * np.pi * 800 * t)
+   plot_continuu(t, b ,"b")
 
 
    # subpunct c
@@ -99,8 +93,9 @@ def exercitiul2():
 
    # subpunct d
    # square | f = 300 Hz
-   d = np.sign(np.sin(2 * np.pi * 300 * np.linspace(0,5, 5*300)))
-   plot_discret(d ,"d")
+   t = np.linspace(0,5, 5*300)
+   d = np.sign(np.sin(2 * np.pi * 300 * t))
+   plot_continuu(t, d ,"d")
 
 
    # subpunct e
@@ -114,11 +109,10 @@ def exercitiul2():
 
    # subpunct f
    # 2D 2^7 x 2^7
-   # semnal --> initializat cu pixelii dintr-o imagine 128 x 128
+   # semnal --> initializat cu pixelii dintr-o imagine 128 x 128 
    f = plt.imread("img.jpg")
    f = f[:, :, 0]  
    f = f / 255.0   
-   f[:f.shape[0], :f.shape[1]] = f
    plt.imshow(f, cmap='gray')
    plt.grid()
    plt.savefig("Images/ex2_f.pdf", format='pdf')
@@ -147,7 +141,8 @@ def exercitiul3():
 
 if __name__ == "__main__":
    #exercitiul1(0, 0.3, 0.0005)
-   #exercitiul2()
+   exercitiul2()
+   #pentru exercitiul3 rezolvarea e in functia exercitiul3() in comentarii
    pass
 
 
