@@ -83,7 +83,7 @@ def exercitiul1():
 
 def exercitiul2():
     fs = 20 # frecventa de esantionare
-    f0, f1, f2 = 25, 45, 65 # frecventele semnalelor
+    f0, f1, f2 = 15, 35, 55 # frecventele semnalelor 15, 15+20 , 15+ 20*2
     t = np.linspace(0, 1, 1000, endpoint=False)
     n = np.linspace(0, 1, fs, endpoint=False)
 
@@ -112,9 +112,9 @@ def exercitiul2():
 
 
 
-def exercitiul3():
-    fs = 150 # noua frecv de esantionare
-    f0, f1, f2 = 25, 45, 65 # frecventele semnalelor
+def exercitiul3(): 
+    fs = 50 # noua frecv de esantionare
+    f0, f1, f2 = 15, 65, 115 # frecventele semnalelor 
     t = np.linspace(0, 1, 1000, endpoint=False)
     n = np.linspace(0, 1, fs, endpoint=False) 
 
@@ -226,9 +226,9 @@ def exercitiul7():
 
 if __name__ == "__main__":
     # exercitiile 4, 5, 7 sunt rezolvare in comentariile de la functiile corespunzatoare
-    exercitiul1()
-    exercitiul2()
+    # exercitiul1()
+    # exercitiul2()
     exercitiul3()
-    exercitiul6()
+    #exercitiul6()
 
 
