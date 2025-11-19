@@ -110,10 +110,7 @@ def exercitiul4(n=20, d=3):
     x = np.random.rand(n)
     y = np.roll(x, d)
 
-    # corelatia circulara a lui x cu y
-    # ca rezultat se obtine n-d = -d
-    # ca sa il obtinem pe x,  y trb deplasat cu -d pozitii spre stanga
-    c1 = np.fft.ifft(np.fft.fft(x) * np.conj(np.fft.fft(y)))
+    c1 = np.fft.ifft(np.conj(np.fft.fft(x)) * np.fft.fft(y))
     c1_real = np.real(c1)
     c1_index = np.argmax(c1_real)
 
