@@ -4,280 +4,297 @@ import cv2
 from scipy.fft import dctn, idctn
 from scipy import datasets
 
+# matricea de cuantizare (pentru imaginile monocrome)
+Q_jpeg = np.array([
+    [16, 11, 10, 16, 24, 40, 51, 61],
+    [12, 12, 14, 19, 26, 28, 60, 55],
+    [14, 13, 16, 24, 40, 57, 69, 56],
+    [14, 17, 22, 29, 51, 87, 80, 62],
+    [18, 22, 37, 56, 68, 109, 103, 77],
+    [24, 35, 55, 64, 81, 104, 113, 92],
+    [49, 64, 78, 87, 103, 121, 120, 101],
+    [72, 92, 95, 98, 112, 100, 103, 99]
+], dtype=np.float32)
+
+# matricea de cuantizare (pentru componentele cromatice)
+Q_jpeg_chrominance = np.array([
+    [17, 18, 24, 47, 99, 99, 99, 99],
+    [18, 21, 26, 66, 99, 99, 99, 99],
+    [24, 26, 56, 99, 99, 99, 99, 99],
+    [47, 66, 99, 99, 99, 99, 99, 99],
+    [99, 99, 99, 99, 99, 99, 99, 99],
+    [99, 99, 99, 99, 99, 99, 99, 99],
+    [99, 99, 99, 99, 99, 99, 99, 99],
+    [99, 99, 99, 99, 99, 99, 99, 99]
+], dtype=np.float32)
 
 
-"""
-- clasa JpegCompressor implementeaza algoritmul de comprimare JPEG pentru imagini monocrome si color
+
+# conversie RGB -> YCbCr 
+def rgb_to_ycbcr(X):
+
+    # rezultatul YCbCr in urma conversiei
+    X_ycbcr = np.zeros_like(X, dtype=np.float32)
+    h, w, _ = X.shape
+
+    # se parcurge fiecare pixel 
+    for i in range(h):
+        for j in range(w):
+
+            # se extrag componentele R G B
+            R = float(X[i, j, 0])
+            G = float(X[i, j, 1])
+            B = float(X[i, j, 2])
+
+            # se realizeaza conversia
+            Y  = 16  + 0.257 * R + 0.504 * G + 0.098 * B
+            Cb = 128 - 0.148 * R - 0.291 * G + 0.439 * B
+            Cr = 128 + 0.439 * R - 0.368 * G - 0.071 * B
+
+            # se stocheaza valorile in matricea YCbCr
+            X_ycbcr[i, j, 0] = np.clip(Y,  16, 235)
+            X_ycbcr[i, j, 1] = np.clip(Cb, 16, 240)
+            X_ycbcr[i, j, 2] = np.clip(Cr, 16, 240)
+
+    return X_ycbcr
 
 
-- ca si variabile, clasa contine:
-    - Q_jpeg        =  var de clasa, matricea de cuantizare standard JPEG 
-    - X             = var de instanta, imaginea initiala 
-    - X_compressed  = var de instanta, imaginea comprimata
 
+# conversie YCbCr -> RGB 
+def ycbcr_to_rgb(X_compressed):
+
+    # rezultatul RGB in urma conversiei
+    X_rgb = np.zeros_like(X_compressed, dtype=np.float32)
+    h, w, _ = X_compressed.shape
+
+    # se parcurge fiecare pixel
+    for i in range(h):
+        for j in range(w):
+
+            # se extrag componentele Y Cb Cr
+            # se realizeaza conversia
+            Y  = float(X_compressed[i, j, 0]) - 16.0
+            Cb = float(X_compressed[i, j, 1]) - 128.0
+            Cr = float(X_compressed[i, j, 2]) - 128.0
+
+            R = 1.164 * Y + 1.596 * Cr
+            G = 1.164 * Y - 0.392 * Cb - 0.813 * Cr
+            B = 1.164 * Y + 2.017 * Cb
+
+            # se stocheaza valorile in matricea RGB
+            X_rgb[i, j, 0] = np.clip(R, 0, 255)
+            X_rgb[i, j, 1] = np.clip(G, 0, 255)
+            X_rgb[i, j, 2] = np.clip(B, 0, 255)
+
+    return X_rgb
+
+
+
+""" Cerinta 1 - comprimarea iamginilor monocrome """
+def compress_monochrome_image(X, s = 1):
+
+    # s = factorul de scalare a matricii de cuantizare, by default egal cu 1 
+    # Q = matricea de cuantizare scalata
+    # se va utiliza doar matricea Q_jpeg pentru ca imaginea e monocroma (componenta de luminozitate)
+
+    Q = s * Q_jpeg
+    h, w = X.shape
+
+    # se ajusteaza dimensiunile imaginii pentru a fi multipli de 8 (dimensiunea blocului, impartirea e exacta)
+    h = (h // 8) * 8
+    w = (w // 8) * 8
+    X = X[:h, :w]  
+
+    # imaginea comprimata
+    X_compressed = np.zeros_like(X, dtype=np.float32)
+
+    # se parcurge fiecare bloc de 8x8 si se realizeaza compresia    
+    for i in range(0, h, 8):
+        for j in range(0, w, 8):
+            x = X[i:i+8, j:j+8]
+            y = dctn(x)
+            y_jpeg = Q * np.round(y / Q)
+            x_jpeg = idctn(y_jpeg)
+            X_compressed[i:i+8, j:j+8] = x_jpeg
+
+    return X_compressed
+
+
+
+""" Cerinta 2 - comprimarea iamginilor color """
+def compress_color_image(X, s=1):
     
-- ca si metode, clasa contine:
-    - rgb_to_ycbcr               = conversia unei imagini RGB in YCbCr 
-    - ycbcr_to_rgb               = conversia unei imagini YCbCr in RGB
-    - compress_monochrome_image  = comprimarea unei imagini monocrome
-    - compress_color_image       = comprimarea unei imagini color 
-    - mse_compression            = comprimarea unei imagini pana la un MSE dat 
-    - video_compression          = comprimarea unui fisier video 
+    # s = factorul de scalare a matricii de cuantizare, by default egal cu 1 
+    # QY = matricea de cuantizare scalata pentru componenta de luminozitate (Y)
+    # QC = matricea de cuantizare scalata pentru componentele cromatice (Cb si Cr)
+
+    QY = s * Q_jpeg
+    QC = s * Q_jpeg_chrominance
+    h, w, _ = X.shape
+
+    # se ajusteaza dimensiunile imaginii pentru a fi multipli de 8 (dimensiunea blocului, impartirea e exacta)
+    h = (h // 8) * 8
+    w = (w // 8) * 8
+    X = X[:h, :w]
+
+    # se realizeaza conversia RGB -> YCbCr
+    X_ycbcr = rgb_to_ycbcr(X).astype(np.float32)
+    # imaginea comprimata in spatiul YCbCr
+    X_compressed = np.zeros_like(X_ycbcr, dtype=np.float32)
+
+    # se parcurge fiecare bloc de 8x8 si se realizeaza compresia 
+    for i in range(0, h, 8):
+        for j in range(0, w, 8):
+
+            # Y
+            x = X_ycbcr[i:i+8, j:j+8, 0]
+            y = dctn(x)
+            y_jpeg = QY * np.round(y / QY)
+            X_compressed[i:i+8, j:j+8, 0] = idctn(y_jpeg)
 
-- conversiile RGB <-> YCbCr confoma ITU-R BT.601 : https://web.archive.org/web/20180421030430/http://www.equasys.de/colorconversion.html
+            # Cb
+            x = X_ycbcr[i:i+8, j:j+8, 1]
+            y = dctn(x)
+            y_jpeg = QC * np.round(y / QC)
+            X_compressed[i:i+8, j:j+8, 1] = idctn(y_jpeg)
+
+            # Cr
+            x = X_ycbcr[i:i+8, j:j+8, 2]
+            y = dctn(x)
+            y_jpeg = QC * np.round(y / QC)
+            X_compressed[i:i+8, j:j+8, 2] = idctn(y_jpeg)
+
+    # se realizeaza conversia YCbCr -> RGB si se ret rezultatul
+    return ycbcr_to_rgb(X_compressed)
 
-"""
 
 
-class JpegCompressor:
+""" Cerinta 3 - comprimarea imaginilor cu MSE dat """
+def mse_compression(X, mse_threshold=100, steps=30, color=True):
 
-    
-    Q_jpeg = np.array([
-        [16, 11, 10, 16, 24, 40, 51, 61],
-        [12, 12, 14, 19, 26, 28, 60, 55],
-        [14, 13, 16, 24, 40, 57, 69, 56],
-        [14, 17, 22, 29, 51, 87, 80, 62],
-        [18, 22, 37, 56, 68, 109, 103, 77],
-        [24, 35, 55, 64, 81, 104, 113, 92],
-        [49, 64, 78, 87, 103, 121, 120, 101],
-        [72, 92, 95, 98, 112, 100, 103, 99]
-    ], dtype=np.float32)
+    # se cauta factorul de scalare optim s folosind cautarea binara
+    # presupunam ca s se afla in intervalul [min_, max_]
+    min_, max_ = 1.0, 500.0
+    image, s_ = None, None
+    X = X.astype(np.float32)
+
+    # presupunem ca facem maxim steps iteratii
+    for _ in range(steps):
+        s = (min_ + max_) / 2.0
 
+        # imaginea poate fi color sau monocroma
+        if color:
+            X_compressed = compress_color_image(X, s)
+        else:
+            X_compressed = compress_monochrome_image(X, s)
 
+        # se calculeaza MSE intre imaginea originala si cea comprimata
+        mse = np.mean((X - X_compressed.astype(np.float32)) ** 2)
 
-    # initializare : X = iamgea , X_compressed = imaginea comprimata
-    def __init__(self, image):
-        self.X = image
-        self.X_compressed = np.zeros_like(image)
+        # se ajusteaza intervalul de cautare in functie de mse
+        if mse <= mse_threshold:
+            image = X_compressed
+            s_ = s
+            min_ = s      
+        else:
+            max_ = s       
 
-    
+    return s_, image
 
-    # conversie RGB -> YCbCr 
-    def __rgb_to_ycbcr(self):
 
-        X_ycbcr = np.zeros_like(self.X, dtype=np.float32)
-        h, w, _ = self.X.shape
 
-        for i in range(h):
-            for j in range(w):
+""" Cerinta 4 - comprimarea unui video """
+def cerinta4(input_path, output_path, s=200, scale = 1/3):
 
-                R = float(self.X[i, j, 0])
-                G = float(self.X[i, j, 1])
-                B = float(self.X[i, j, 2])
+    # se citeste inputul (un video de pe disc)
+    input = cv2.VideoCapture(input_path)
+    if not input.isOpened():
+        raise ValueError(f"cannot open input video: {input_path}")
 
-                Y  = 16  + 0.257 * R + 0.504 * G + 0.098 * B
-                Cb = 128 - 0.148 * R - 0.291 * G + 0.439 * B
-                Cr = 128 + 0.439 * R - 0.368 * G - 0.071 * B
+    fps = input.get(cv2.CAP_PROP_FPS)
+    if not fps or fps <= 1e-1:
+        fps = 25.0
 
-                X_ycbcr[i, j, 0] = np.clip(Y,  16, 235)
-                X_ycbcr[i, j, 1] = np.clip(Cb, 16, 240)
-                X_ycbcr[i, j, 2] = np.clip(Cr, 16, 240)
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
 
-        return X_ycbcr
-    
+    # se scade rezolutia (pt cost computational mai mic...), se ajusteaza dimensiunile pentru a fi multipli de 8
+    w = int(input.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h = int(input.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    w = int(w * scale)
+    h = int(h * scale)
+    h = (h // 8) * 8
+    w = (w // 8) * 8
 
+    output = cv2.VideoWriter(output_path, fourcc, fps, (w, h))
+    if not output.isOpened():
+        raise ValueError(f"cannot create output video: {output_path}")
 
-    # conversie YCbCr -> RGB 
-    def __ycbcr_to_rgb(self):
+    # se parcurg toate frame-urile din video
+    # pentru fiecare frame se realizeaza compresia 
+    while True:
+        ret, frame_bgr = input.read()
+        if not ret:
+            break
 
-        X_rgb = np.zeros_like(self.X_compressed, dtype=np.float32)
-        h, w, _ = self.X_compressed.shape
+        frame_bgr = cv2.resize(frame_bgr, (w, h))
+        frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+        frame_rgb_comp = compress_color_image(frame_rgb.astype(np.float32), s=s)
+        frame_out = np.clip(frame_rgb_comp, 0, 255).astype(np.uint8)
+        frame_out = cv2.cvtColor(frame_out, cv2.COLOR_RGB2BGR)
+        output.write(frame_out)
 
-        for i in range(h):
-            for j in range(w):
+    # se elibereaza resursele
+    input.release()
+    output.release()
 
-                Y  = float(self.X_compressed[i, j, 0]) - 16.0
-                Cb = float(self.X_compressed[i, j, 1]) - 128.0
-                Cr = float(self.X_compressed[i, j, 2]) - 128.0
 
-                R = 1.164 * Y + 1.596 * Cr
-                G = 1.164 * Y - 0.392 * Cb - 0.813 * Cr
-                B = 1.164 * Y + 2.017 * Cb
 
-                X_rgb[i, j, 0] = np.clip(R, 0, 255)
-                X_rgb[i, j, 1] = np.clip(G, 0, 255)
-                X_rgb[i, j, 2] = np.clip(B, 0, 255)
+""" Apelurile functiilor pentru cerintele 1,2,3 """
 
-        return X_rgb
+def cerinta1():
+    X = datasets.ascent()
+    X_compressed = compress_monochrome_image(X)
 
+    plt.subplot(1,2,1)
+    plt.imshow(X, cmap='gray')
+    plt.title("original")
+    plt.subplot(1,2,2)
+    plt.imshow(X_compressed, cmap='gray')
+    plt.title("comprimat")
+    plt.savefig("Images/cerinta1.pdf", format="pdf")
 
 
-    """ Cerinta 1 """
-    # comprimarea unei imagini monocrome
-    def compress_monochrome_image(self, Q = None):
-        
-        # daca nu e specificata o matrice de cuantizare, se foloseste cea standard
-        if Q is None:
-            Q = self.Q_jpeg
 
-        h, w = self.X.shape
+def cerinta2():
+    X = datasets.face()
+    X_compressed = compress_color_image(X, s=1)
 
-       # daca h, w nu sunt multipli de 8, atunci "restul" de pixeli, ramane 0
-        for i in range(0, h, 8):
-            for j in range(0, w, 8):
+    plt.subplot(1,2,1)
+    plt.imshow(X)
+    plt.title("original")
+    plt.subplot(1,2,2)
+    plt.imshow(X_compressed.astype(np.uint8))
+    plt.title("comprimat")
+    plt.savefig("Images/cerinta2.pdf", format="pdf")
 
-                # se ia fiecare pachet de 8x8
-                x = self.X[i:i+8, j:j+8]
-                y = dctn(x)
-                y_jpeg = Q * np.round(y / Q)
-                x_jpeg = idctn(y_jpeg)
 
-                # se insereaza inapoi in imaginea comprimata
-                self.X_compressed[i:i+8, j:j+8] = x_jpeg
 
+def cerinta3(mse):
+    X = datasets.face()  
+    s, X_compressed = mse_compression(X, mse)
 
+    plt.imshow(X_compressed.astype(np.uint8))
+    plt.title(f"mse = {mse} & s = {s:.2f}")
+    plt.savefig(f"Images/cerinta3_{mse}.pdf", format="pdf")
 
-    # comprimarea unei imagini color
-    def compress_color_image(self, Q = None):
 
-        # daca nu e specificata o matrice de cuantizare , se foloseste cea standard
-        if Q is None:
-            Q = self.Q_jpeg
 
-        # se converteste imaginea in YCbCr
-        X_ycbcr = self.__rgb_to_ycbcr()
-        h, w , _ = self.X.shape
-
-        for c in range(3):  
-            for i in range(0, h, 8):
-                for j in range(0, w, 8):
-
-                    # se ia fiecare pachet de 8x8 pentru fiecare canal
-                    x = X_ycbcr[i:i+8, j:j+8, c]    
-                    y = dctn(x)
-                    y_jpeg = Q * np.round(y / Q)
-                    x_jpeg = idctn(y_jpeg)
-                    # se insereaza inapoi in imaginea comprimata
-                    self.X_compressed [i:i+8, j:j+8, c] = x_jpeg
-
-        # se converteste inapoi in RGB
-        self.X_compressed = self.__ycbcr_to_rgb()
-
-
-
-
-    # comprimarea unei imagini pana la un MSE dat ca prag
-    def mse_compression(self, mse_threshold=1500, color=True, steps=20):
-       
-        # cautam scalarea optima folosind cautarea binara
-        low, high = 0.1, 1500
-        best_img = None
-        best_s = None
-
-        for _ in range(steps):
-           
-            s = (low + high) / 2.0
-            Qs = s * self.Q_jpeg
-
-            # se ia pe cazuri, in functie de tipul imaginii
-            if not color:
-                self.compress_monochrome_image(Qs)
-            else:
-                self.compress_color_image(Qs)
-
-            # calculam MSE
-            mse = np.mean((self.X.astype(np.float32) - self.X_compressed.astype(np.float32)) ** 2)
-
-            if mse <= mse_threshold:
-                best_img = self.X_compressed.copy()
-                best_s = s
-                low = s          
-            else:
-                high = s         
-
-        return best_s, best_img
-
-
-
-
-    def video_compression(self, input_path, output_path):
-        import cv2
-        import numpy as np
-
-        cap = cv2.VideoCapture(input_path)
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-
-        # rezolutie mica (rapid)
-        target_w, target_h = 960, 540
-        target_h = (target_h // 8) * 8   # 536
-        target_w = (target_w // 8) * 8   # 960
-
-        out = cv2.VideoWriter(output_path, fourcc, fps, (target_w, target_h))
-
-        Qs = 40 * self.Q_jpeg  # mare = blur
-
-        while True:
-            ret, frame_bgr = cap.read()
-            if not ret:
-                break
-
-            frame_bgr = cv2.resize(frame_bgr, (target_w, target_h))
-            frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-
-            comp = JpegCompressor(frame_rgb)
-            comp.compress_color_image(Qs)
-
-            frame_out = np.clip(comp.X_compressed, 0, 255).astype(np.uint8)
-            frame_out = cv2.cvtColor(frame_out, cv2.COLOR_RGB2BGR)
-            out.write(frame_out)
-
-        cap.release()
-        out.release()
-
-
-    # compressor = JpegCompressor(datasets.face())
-    # compressor.video_compression(
-    #     input_path="D:\\GitHubRepo\\Procesarea_Semnalelor\\Tema\\raton.mp4",
-    #     output_path="D:\\GitHubRepo\\Procesarea_Semnalelor\\Tema\\raton_compressed.mp4"
-    # )     
-    #     plt.savefig(f"Images/ex3.pdf", format='pdf')
-  
-            
-
-
-def cerinata_1():
-    # imagea din cerinta 
-    X = datasets.ascent().astype(np.float32)
-    mono = JpegCompressor(X)
-    mono.compress_monochrome_image()
-
+# Main
 if __name__ == "__main__":
-
-    # 
-    
-
-    monochrome_compression = JpegCompressor(X)
-    monochrome_compression.compress_monochrome_image(Q=10 * monochrome_compression.Q_jpeg)
-    Y = monochrome_compression.X_compressed
-
-    # coordonate patch-uri 8x8
-    patch_coords = [
-        (0, 0),
-        (64, 64),
-        (128, 128)
-    ]
-
-    # extragere patch-uri
-    patches_X = [X[i:i+8, j:j+8] for (i, j) in patch_coords]
-    patches_Y = [Y[i:i+8, j:j+8] for (i, j) in patch_coords]
-
-    # salvare patch-uri
-    plt.imsave("patch_X_1.png", patches_X[0], cmap="gray", vmin=0, vmax=255)
-    plt.imsave("patch_Y_1.png", patches_Y[0], cmap="gray", vmin=0, vmax=255)
-
-    plt.imsave("patch_X_2.png", patches_X[1], cmap="gray", vmin=0, vmax=255)
-    plt.imsave("patch_Y_2.png", patches_Y[1], cmap="gray", vmin=0, vmax=255)
-
-    plt.imsave("patch_X_3.png", patches_X[2], cmap="gray", vmin=0, vmax=255)
-    plt.imsave("patch_Y_3.png", patches_Y[2], cmap="gray", vmin=0, vmax=255)
-
-
-
-
-    
-
-
-
-        
-        
+    cerinta1()
+    cerinta2()
+    cerinta3(100)
+    cerinta3(200)
+    cerinta3(300)
+    cerinta3(400)
+    cerinta4("Images\\cerinta4_raton_input.mp4", "Images\\cerinta4_raton_output.mp4")
